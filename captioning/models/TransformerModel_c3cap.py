@@ -112,11 +112,18 @@ class EncoderLayer(nn.Module):
         self.sublayer = clones(SublayerConnection(size, dropout), 3)
         self.size = size
         self.c3dict = c3dict
+        self.c3dict.requires_grad_(False)
+        self.clip_emb = nn.Linear(self.c3dict.shape[1], self.size)
+        nn.init.xavier_uniform_(self.clip_emb.weight)
+        nn.init.constant_(self.clip_emb.bias, 0)
 
     def forward(self, x, mask):
         "Follow Figure 1 (left) for connections."
         x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))
-        x = self.sublayer[1](x, lambda x: self.fuse_attn(x, self.c3dict, self.c3dict, mask))
+        confounder = self.clip_emb(self.c3dict.to(x.device))
+        confounder = torch.stack([confounder] * x.shape[0])
+        # x = self.sublayer[1](x, lambda x: self.fuse_attn(x, confounder, confounder))
+        x = self.sublayer[1](x, lambda x: self.fuse_attn(x, confounder, confounder, mask))
         return self.sublayer[2](x, self.feed_forward)
 
 class Decoder(nn.Module):
@@ -125,7 +132,7 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
-        
+         
     def forward(self, x, memory, src_mask, tgt_mask):
         for layer in self.layers:
             x = layer(x, memory, src_mask, tgt_mask)
@@ -159,9 +166,18 @@ def attention(query, key, value, mask=None, dropout=None):
     d_k = query.size(-1)
     scores = torch.matmul(query, key.transpose(-2, -1)) \
              / math.sqrt(d_k)
+    need_transpose = True if scores.shape[-1] != mask.shape[-1] and mask is not None else False
     if mask is not None:
-        scores = scores.masked_fill(mask == 0, float('-inf'))
-    p_attn = F.softmax(scores, dim = -1)
+        if need_transpose:
+            scores = scores.transpose(2,3)
+            scores = scores.masked_fill(mask == 0, float('-inf'))
+            scores = scores.transpose(2,3)
+        else:
+            scores = scores.masked_fill(mask == 0, float('-inf'))
+    if need_transpose:
+        p_attn = F.softmax(scores, dim=-2)
+    else:
+        p_attn = F.softmax(scores, dim=-1)
     if dropout is not None:
         p_attn = dropout(p_attn)
     return torch.matmul(p_attn, value), p_attn
