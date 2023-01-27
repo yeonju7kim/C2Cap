@@ -11,6 +11,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import pickle
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -102,17 +104,20 @@ class SublayerConnection(nn.Module):
 
 class EncoderLayer(nn.Module):
     "Encoder is made up of self-attn and feed forward (defined below)"
-    def __init__(self, size, self_attn, feed_forward, dropout):
+    def __init__(self, size, self_attn, fuse_attn, feed_forward, dropout, c3dict):
         super(EncoderLayer, self).__init__()
         self.self_attn = self_attn
+        self.fuse_attn = fuse_attn
         self.feed_forward = feed_forward
-        self.sublayer = clones(SublayerConnection(size, dropout), 2)
+        self.sublayer = clones(SublayerConnection(size, dropout), 3)
         self.size = size
+        self.c3dict = c3dict
 
     def forward(self, x, mask):
         "Follow Figure 1 (left) for connections."
         x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))
-        return self.sublayer[1](x, self.feed_forward)
+        x = self.sublayer[1](x, lambda x: self.fuse_attn(x, self.c3dict, self.c3dict, mask))
+        return self.sublayer[2](x, self.feed_forward)
 
 class Decoder(nn.Module):
     "Generic N layer decoder with masking."
@@ -244,7 +249,7 @@ class TransformerModel_c3cap(AttModel):
         ff = PositionwiseFeedForward(d_model, d_ff, dropout)
         position = PositionalEncoding(d_model, dropout)
         model = EncoderDecoder(
-            Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout), N_enc),
+            Encoder(EncoderLayer(d_model, c(attn), c(attn), c(ff), dropout, c3dict=self.c3dict), N_enc),
             Decoder(DecoderLayer(d_model, c(attn), c(attn), 
                                  c(ff), dropout), N_dec),
             lambda x:x, # nn.Sequential(Embeddings(d_model, src_vocab), c(position)),
@@ -259,7 +264,7 @@ class TransformerModel_c3cap(AttModel):
         return model
 
     def __init__(self, opt):
-        super(TransformerModel, self).__init__(opt)
+        super(TransformerModel_c3cap, self).__init__(opt)
         self.opt = opt
         # self.config = yaml.load(open(opt.config_file))
         
@@ -287,6 +292,10 @@ class TransformerModel_c3cap(AttModel):
 
         tgt_vocab = self.vocab_size + 1
 
+        with open(opt.clip_feature_path, 'rb') as f:
+            clip_feature_cluster = pickle.load(f)
+            self.c3dict = torch.tensor(np.array([feature for id, feature in clip_feature_cluster.items()]), dtype=torch.float32)
+            self.c3dict.requires_grad_(False)
 
         self.model = self.make_model(0, tgt_vocab,
             N_enc=self.N_enc,

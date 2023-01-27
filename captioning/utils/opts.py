@@ -205,6 +205,8 @@ def parse_opt():
     parser.add_argument('--drop_worst_rate', type=float, default=0,
                     help='')
 
+    parser.add_argument('--clip_feature_path', type=str, default='',
+                        help='')
 
     # For diversity evaluation during training
     add_diversity_opts(parser)

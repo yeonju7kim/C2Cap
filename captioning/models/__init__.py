@@ -12,6 +12,7 @@ from .ShowTellModel import ShowTellModel
 from .FCModel import FCModel
 from .AttModel import *
 from .TransformerModel import TransformerModel
+from .TransformerModel_c3cap import TransformerModel_c3cap
 from .cachedTransformer import TransformerModel as cachedTransformer
 from .BertCapModel import BertCapModel
 from .M2Transformer import M2TransformerModel
@@ -60,6 +61,8 @@ def setup(opt):
             model = cachedTransformer(opt)
         else:
             model = TransformerModel(opt)
+    elif opt.caption_model == 'transformer_c3cap':
+        model = TransformerModel_c3cap(opt)
     # AoANet
     elif opt.caption_model == 'aoa':
         model = AoAModel(opt)
