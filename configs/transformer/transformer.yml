@@ -2,9 +2,9 @@ caption_model: transformer
 noamopt: true
 noamopt_warmup: 20000
 label_smoothing: 0.0
-input_json: data/cocotalk.json
-input_label_h5: data/cocotalk_label.h5
-input_att_dir: data/cocobu_att
+input_json: /mnt/hard_2/kyj/data/cocotalk.json
+input_label_h5: /mnt/hard_2/kyj/data/cocotalk_label.h5
+input_att_dir: /mnt/hard_2/kyj/data/cocobu_att
 seq_per_img: 5
 batch_size: 10
 learning_rate: 0.0005
