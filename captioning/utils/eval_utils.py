@@ -19,6 +19,9 @@ from . import misc as utils
 # load coco-caption if available
 try:
     sys.path.append("coco-caption")
+    sys.path.append("/home/kyj/projects/c3cap-ver2/coco-caption")
+    sys.path.append("coco-caption/pycocoevalcap")
+    sys.path.append("/home/kyj/projects/c3cap-ver2/coco-caption/pycocoevalcap")
     from pycocotools.coco import COCO
     from pycocoevalcap.eval import COCOEvalCap
 except:

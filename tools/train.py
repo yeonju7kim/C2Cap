@@ -2,6 +2,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+try:
+    import sys, os
+    sys.path.append('/home/kyj/projects/c3cap-ver2')
+    sys.path.remove('/home/kyj/projects/self-critical.pytorch')
+except:
+    pass
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -30,7 +37,6 @@ def add_summary_value(writer, key, value, iteration):
         writer.add_scalar(key, value, iteration)
 
 def train(opt):
-
     ################################
     # Build dataloader
     ################################
@@ -74,6 +80,7 @@ def train(opt):
     ##########################
     opt.vocab = loader.get_vocab()
     model = models.setup(opt).cuda()
+
     del opt.vocab
     # Load pretrained weights:
     if opt.start_from is not None and os.path.isfile(os.path.join(opt.start_from, 'model.pth')):
@@ -291,6 +298,8 @@ def train(opt):
         stack_trace = traceback.format_exc()
         print(stack_trace)
 
-
-opt = opts.parse_opt()
-train(opt)
+if __name__ == '__main__':
+    opt = opts.parse_opt()
+    os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+    os.environ['CUDA_VISIBLE_DEVICES'] = opt.device_ids
+    train(opt)

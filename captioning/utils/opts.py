@@ -205,9 +205,19 @@ def parse_opt():
     parser.add_argument('--drop_worst_rate', type=float, default=0,
                     help='')
 
-    parser.add_argument('--clip_feature_path', type=str, default='',
+    # clip confounder dictionary
+    parser.add_argument('--clip_confounder_dictionary_path', type=str, default='',
                         help='')
 
+    # distribute data parallel
+    parser.add_argument('--master_port', type=str, default='12345',
+                        help='')
+    parser.add_argument('--world_size', type=int, default=2,
+                        help='')
+    parser.add_argument('--device_ids', type=str, default='0,1,2,3',
+                        help='')
+
+    #
     # For diversity evaluation during training
     add_diversity_opts(parser)
 

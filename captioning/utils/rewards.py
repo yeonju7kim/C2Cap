@@ -10,6 +10,7 @@ import torch
 import sys
 try:
     sys.path.append("cider")
+    sys.path.append("/home/kyj/projects/c3cap-ver2/cider")
     from pyciderevalcap.ciderD.ciderD import CiderD
     from pyciderevalcap.cider.cider import Cider
     sys.path.append("coco-caption")

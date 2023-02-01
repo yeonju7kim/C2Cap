@@ -122,8 +122,8 @@ class EncoderLayer(nn.Module):
         x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))
         confounder = self.clip_emb(self.c3dict.to(x.device))
         confounder = torch.stack([confounder] * x.shape[0])
-        # x = self.sublayer[1](x, lambda x: self.fuse_attn(x, confounder, confounder))
-        x = self.sublayer[1](x, lambda x: self.fuse_attn(x, confounder, confounder, mask))
+        x = self.sublayer[1](x, lambda x: self.fuse_attn(x, confounder, confounder))
+        # x = self.sublayer[1](x, lambda x: self.fuse_attn(x, confounder, confounder, mask))
         return self.sublayer[2](x, self.feed_forward)
 
 class Decoder(nn.Module):
@@ -166,7 +166,7 @@ def attention(query, key, value, mask=None, dropout=None):
     d_k = query.size(-1)
     scores = torch.matmul(query, key.transpose(-2, -1)) \
              / math.sqrt(d_k)
-    need_transpose = True if scores.shape[-1] != mask.shape[-1] and mask is not None else False
+    need_transpose = True if mask != None and scores.shape[-1] != mask.shape[-1] and mask is not None else False
     if mask is not None:
         if need_transpose:
             scores = scores.transpose(2,3)
@@ -308,7 +308,7 @@ class TransformerModel_c3cap(AttModel):
 
         tgt_vocab = self.vocab_size + 1
 
-        with open(opt.clip_feature_path, 'rb') as f:
+        with open(opt.clip_confounder_dictionary_path, 'rb') as f:
             clip_feature_cluster = pickle.load(f)
             self.c3dict = torch.tensor(np.array([feature for id, feature in clip_feature_cluster.items()]), dtype=torch.float32)
             self.c3dict.requires_grad_(False)

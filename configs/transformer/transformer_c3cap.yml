@@ -11,5 +11,5 @@ structure_loss_weight: 1
 structure_loss_type: new_self_critical
 
 max_epochs: 40
-clip_feature_path: clip_cluster_coco_train.pkl
+clip_confounder_dictionary_path: clip_cluster_coco_train.pkl
 caption_model: transformer_c3cap

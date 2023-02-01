@@ -128,7 +128,6 @@ dmypy.json
 # Pyre type checker
 .pyre/
 .idea
-coco-caption
 eval_results
 *.pkl
 *.pth
