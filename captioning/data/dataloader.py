@@ -318,9 +318,10 @@ class DataLoader:
                                                   batch_size=self.batch_size,
                                                   sampler=sampler,
                                                   pin_memory=True,
-                                                  num_workers=4, # 4 is usually enough
+                                                  num_workers=0, # 4 is usually enough
                                                   collate_fn=partial(self.dataset.collate_func, split=split),
-                                                  drop_last=False)
+                                                  drop_last=False,
+                                                  shuffle=False)
             self.iters[split] = iter(self.loaders[split])
 
 

@@ -212,9 +212,9 @@ def parse_opt():
     # distribute data parallel
     parser.add_argument('--master_port', type=str, default='12345',
                         help='')
-    parser.add_argument('--world_size', type=int, default=2,
+    parser.add_argument('--world_size', type=int, default=3,
                         help='')
-    parser.add_argument('--device_ids', type=str, default='0,1,2,3',
+    parser.add_argument('--device_ids', type=str, default='1,2,3',
                         help='')
 
     #

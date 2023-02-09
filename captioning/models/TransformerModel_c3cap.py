@@ -104,27 +104,32 @@ class SublayerConnection(nn.Module):
 
 class EncoderLayer(nn.Module):
     "Encoder is made up of self-attn and feed forward (defined below)"
-    def __init__(self, size, self_attn, fuse_attn, feed_forward, dropout, c3dict):
+    def __init__(self, size, self_attn, feed_forward, dropout, c3dict):
         super(EncoderLayer, self).__init__()
         self.self_attn = self_attn
-        self.fuse_attn = fuse_attn
         self.feed_forward = feed_forward
-        self.sublayer = clones(SublayerConnection(size, dropout), 3)
+        self.sublayer = clones(SublayerConnection(size, dropout), 2)
         self.size = size
         self.c3dict = c3dict
         self.c3dict.requires_grad_(False)
         self.clip_emb = nn.Linear(self.c3dict.shape[1], self.size)
         nn.init.xavier_uniform_(self.clip_emb.weight)
         nn.init.constant_(self.clip_emb.bias, 0)
+        self.clip_emb2 = nn.Linear(self.c3dict.shape[1], self.size)
+        nn.init.xavier_uniform_(self.clip_emb2.weight)
+        nn.init.constant_(self.clip_emb2.bias, 0)
 
     def forward(self, x, mask):
         "Follow Figure 1 (left) for connections."
-        x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))
         confounder = self.clip_emb(self.c3dict.to(x.device))
         confounder = torch.stack([confounder] * x.shape[0])
-        x = self.sublayer[1](x, lambda x: self.fuse_attn(x, confounder, confounder))
-        # x = self.sublayer[1](x, lambda x: self.fuse_attn(x, confounder, confounder, mask))
-        return self.sublayer[2](x, self.feed_forward)
+        dist = torch.cdist(x, confounder)
+        score = torch.softmax(-1 * dist, axis=-1)
+        confounder = torch.matmul(score, confounder)
+        confounder = self.clip_emb2(confounder)
+
+        x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask) + confounder)
+        return self.sublayer[1](x, self.feed_forward)
 
 class Decoder(nn.Module):
     "Generic N layer decoder with masking."
@@ -265,7 +270,7 @@ class TransformerModel_c3cap(AttModel):
         ff = PositionwiseFeedForward(d_model, d_ff, dropout)
         position = PositionalEncoding(d_model, dropout)
         model = EncoderDecoder(
-            Encoder(EncoderLayer(d_model, c(attn), c(attn), c(ff), dropout, c3dict=self.c3dict), N_enc),
+            Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout, c3dict=self.c3dict), N_enc),
             Decoder(DecoderLayer(d_model, c(attn), c(attn), 
                                  c(ff), dropout), N_dec),
             lambda x:x, # nn.Sequential(Embeddings(d_model, src_vocab), c(position)),
