@@ -1,1 +1,1 @@
-# c3cap-ver2
+python tools/train.py --cfg configs/transformer/transformer_c3cap_no_projection.yml --id from_pretrain_230220 --batch_size 30 --cached_tokens /mnt/hard_2/kyj/data/coco-train-idxs --clip_confounder_dictionary_path clip_feature_train_cluster_k1000_aug3_all_image_mag1.pkl --structure_after 3 --max_epoch 10
