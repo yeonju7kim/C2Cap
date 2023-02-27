@@ -19,6 +19,7 @@ import captioning.utils.misc as utils
 import captioning.modules.losses as losses
 import torch
 
+os.environ['CUDA_VISIBLE_DEVICES'] = "1"
 # Input arguments and options
 parser = argparse.ArgumentParser()
 # Input paths
@@ -32,6 +33,7 @@ parser.add_argument('--only_lang_eval', type=int, default=0,
                 help='lang eval on saved results')
 parser.add_argument('--force', type=int, default=0,
                 help='force to evaluate no matter if there are results available')
+parser.add_argument('--clip_confounder_dictionary_path', type=str, default='clip_feature_train_cluster_k1000_aug3_all_image_mag1.pkl')
 parser.add_argument('--device', type=str, default='cuda',
                 help='cpu or cuda')
 opts.add_eval_options(parser)

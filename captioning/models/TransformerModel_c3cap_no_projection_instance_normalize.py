@@ -67,26 +67,42 @@ class Encoder(nn.Module):
     def __init__(self, layer, N):
         super(Encoder, self).__init__()
         self.layers = clones(layer, N)
-        self.norm = LayerNorm(layer.size)
+        self.norm = InstanceNorm(layer.size)
         
     def forward(self, x, mask):
         "Pass the input (and mask) through each layer in turn."
         for layer in self.layers:
             x = layer(x, mask)
-        return self.norm(x)
+        return self.norm(x, mask)
 
-class LayerNorm(nn.Module):
+class InstanceNorm(nn.Module):
     "Construct a layernorm module (See citation for details)."
     def __init__(self, features, eps=1e-6):
-        super(LayerNorm, self).__init__()
+        super(InstanceNorm, self).__init__()
         self.a_2 = nn.Parameter(torch.ones(features))
         self.b_2 = nn.Parameter(torch.zeros(features))
         self.eps = eps
 
-    def forward(self, x):
-        mean = x.mean(-1, keepdim=True)
-        std = x.std(-1, keepdim=True)
-        return self.a_2 * (x - mean) / (std + self.eps) + self.b_2
+    def forward(self, x, mask=None, eps=1e-5):
+        """
+        x of shape: [batch_size (N), num_objects (L), features(C)]
+        mask of shape: [batch_size (N), num_objects (L)]
+        """
+        if mask == None:
+            mean = x.mean(-1, keepdim=True)
+            std = x.std(-1, keepdim=True)
+            return self.a_2 * (x - mean) / (std + self.eps) + self.b_2
+        mask = mask.squeeze(1)
+        mask = mask.float().unsqueeze(-1)  # (N,L,1)
+        mean = (torch.sum(x * mask, 1) / torch.sum(mask, 1))  # (N,C)
+        mean = mean.detach()
+        var_term = ((x - mean.unsqueeze(1).expand_as(x)) * mask) ** 2  # (N,L,C)
+        var = (torch.sum(var_term, 1) / torch.sum(mask, 1))  # (N,C)
+        var = var.detach()
+        mean_reshaped = mean.unsqueeze(1).expand_as(x)  # (N, L, C)
+        var_reshaped = var.unsqueeze(1).expand_as(x)  # (N, L, C)
+        ins_norm = (x - mean_reshaped) / torch.sqrt(var_reshaped + eps)  # (N, L, C)
+        return ins_norm
 
 class SublayerConnection(nn.Module):
     """
@@ -95,49 +111,40 @@ class SublayerConnection(nn.Module):
     """
     def __init__(self, size, dropout):
         super(SublayerConnection, self).__init__()
-        self.norm = LayerNorm(size)
+        self.norm = InstanceNorm(size)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x, sublayer):
+    def forward(self, x, sublayer, mask=None):
         "Apply residual connection to any sublayer with the same size."
-        return x + self.dropout(sublayer(self.norm(x)))
+        return x + self.dropout(sublayer(self.norm(x, mask)))
 
 class EncoderLayer(nn.Module):
     "Encoder is made up of self-attn and feed forward (defined below)"
-    def __init__(self, size, self_attn, feed_forward, dropout, c3dict):
+    def __init__(self, size, self_attn, fuse_attn, feed_forward, dropout, c3dict):
         super(EncoderLayer, self).__init__()
         self.self_attn = self_attn
+        self.fuse_attn = fuse_attn
         self.feed_forward = feed_forward
-        self.sublayer = clones(SublayerConnection(size, dropout), 2)
+        self.sublayer = clones(SublayerConnection(size, dropout), 3)
         self.size = size
         self.c3dict = c3dict
         self.c3dict.requires_grad_(False)
-        self.clip_emb = nn.Linear(self.c3dict.shape[1], self.size)
-        nn.init.xavier_uniform_(self.clip_emb.weight)
-        nn.init.constant_(self.clip_emb.bias, 0)
-        self.clip_emb2 = nn.Linear(self.c3dict.shape[1], self.size)
-        nn.init.xavier_uniform_(self.clip_emb2.weight)
-        nn.init.constant_(self.clip_emb2.bias, 0)
 
     def forward(self, x, mask):
         "Follow Figure 1 (left) for connections."
-        confounder = self.clip_emb(self.c3dict.to(x.device))
-        confounder = torch.stack([confounder] * x.shape[0])
-        confounder = (x.std() / confounder.std()) * confounder
-        dist = torch.cdist(x, confounder)
-        score = torch.softmax(-1 * dist, axis=-1)
-        confounder = torch.matmul(score, confounder)
-        confounder = self.clip_emb2(confounder)
+        confounder_dictionary = self.c3dict.to(x.device)
+        confounder_dictionary = torch.stack([confounder_dictionary] * x.shape[0])
 
-        x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask) + confounder)
-        return self.sublayer[1](x, self.feed_forward)
+        x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask), mask)
+        x = self.sublayer[1](x, lambda x: self.fuse_attn(x, confounder_dictionary, confounder_dictionary), mask)
+        return self.sublayer[2](x, self.feed_forward, mask)
 
 class Decoder(nn.Module):
     "Generic N layer decoder with masking."
     def __init__(self, layer, N):
         super(Decoder, self).__init__()
         self.layers = clones(layer, N)
-        self.norm = LayerNorm(layer.size)
+        self.norm = InstanceNorm(layer.size)
          
     def forward(self, x, memory, src_mask, tgt_mask):
         for layer in self.layers:
@@ -153,10 +160,11 @@ class DecoderLayer(nn.Module):
         self.src_attn = src_attn
         self.feed_forward = feed_forward
         self.sublayer = clones(SublayerConnection(size, dropout), 3)
- 
+
     def forward(self, x, memory, src_mask, tgt_mask):
         "Follow Figure 1 (right) for connections."
         m = memory
+
         x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, tgt_mask))
         x = self.sublayer[1](x, lambda x: self.src_attn(x, m, m, src_mask))
         return self.sublayer[2](x, self.feed_forward)
@@ -252,7 +260,7 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:, :x.size(1)]
         return self.dropout(x)
 
-class TransformerModel_c3cap(AttModel):
+class TransformerModel_c3cap_no_projection_instance_normalize(AttModel):
 
     def make_model(self, src_vocab, tgt_vocab, N_enc=6, N_dec=6, 
                d_model=512, d_ff=2048, h=8, dropout=0.1):
@@ -262,8 +270,8 @@ class TransformerModel_c3cap(AttModel):
         ff = PositionwiseFeedForward(d_model, d_ff, dropout)
         position = PositionalEncoding(d_model, dropout)
         model = EncoderDecoder(
-            Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout, c3dict=self.c3dict), N_enc),
-            Decoder(DecoderLayer(d_model, c(attn), c(attn), 
+            Encoder(EncoderLayer(d_model, c(attn), c(attn), c(ff), dropout, c3dict=self.c3dict), N_enc),
+            Decoder(DecoderLayer(d_model, c(attn), c(attn),
                                  c(ff), dropout), N_dec),
             lambda x:x, # nn.Sequential(Embeddings(d_model, src_vocab), c(position)),
             nn.Sequential(Embeddings(d_model, tgt_vocab), c(position)),
@@ -277,7 +285,8 @@ class TransformerModel_c3cap(AttModel):
         return model
 
     def __init__(self, opt):
-        super(TransformerModel_c3cap, self).__init__(opt)
+        super(TransformerModel_c3cap_no_projection_instance_normalize, self).__init__(opt)
+        print('TransformerModel_c3cap_no_projection')
         self.opt = opt
         # self.config = yaml.load(open(opt.config_file))
         

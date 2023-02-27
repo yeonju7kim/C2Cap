@@ -2,10 +2,16 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 import sys, os
-sys.path.append('/home/kyj/projects/c3cap-ver2')
-sys.path.append('/home/yeonju_gpu/c3cap')
-sys.path.append('/home/junho/c3cap2')
 
+sys.path.append('/home/habangk123/c3cap')
+sys.path.append('/home/yeonju_gpu/c3cap')
+sys.path.append('/home/yeonju_gcp/c3cap')
+sys.path.append('/home/yeonju_gpu/c3cap/captioning')
+sys.path.append('/home/yeonju_gcp/c3cap/captioning')
+sys.path.append('/home/kyj/projects/c3cap-ver2/captioning')
+sys.path.append('/home/kyj/projects/c3cap-ver2')
+sys.path.append('/home/junho/c3cap2')
+sys.path.append('/home/junho/c3cap2/captioning')
 try:
     sys.path.remove('/home/kyj/projects/self-critical.pytorch')
 except:
@@ -32,20 +38,13 @@ import captioning.utils.eval_utils as eval_utils
 import captioning.utils.misc as utils
 from captioning.utils.rewards import init_scorer, get_self_critical_reward
 from captioning.modules.loss_wrapper import LossWrapper
-import torch.multiprocessing as mp
-from torch.nn.parallel.distributed import DistributedDataParallel as DDP
-from torch.utils.data.distributed import DistributedSampler
-import torch.distributed as dist
+
 
 def add_summary_value(writer, key, value, iteration):
     if writer:
         writer.add_scalar(key, value, iteration)
 
-def main(gpu, ngpus_per_node, opt):
-    device = torch.device(f'cuda:{gpu}')
-    dist.init_process_group(backend='nccl', world_size=ngpus_per_node, rank=gpu)
-    torch.cuda.set_device(gpu)
-    torch.cuda.empty_cache()
+def train(opt):
     ################################
     # Build dataloader
     ################################
@@ -63,13 +62,13 @@ def main(gpu, ngpus_per_node, opt):
         'vocab': loader.get_vocab(),
     }
     # Load old infos(if there is) and check if models are compatible
-    if opt.start_from is not None and os.path.isfile(os.path.join('log_' + opt.start_from, 'infos_'+opt.id+'.pkl')):
-        with open(os.path.join('log_' + opt.start_from, 'infos_'+opt.id+'.pkl'), 'rb') as f:
+    if opt.start_from is not None and os.path.isfile(os.path.join(opt.start_from, 'infos_trans_nscl-best.pkl')):
+        with open(os.path.join(opt.start_from, 'infos_trans_nscl-best.pkl'), 'rb') as f:
             infos = utils.pickle_load(f)
-            saved_model_opt = infos['opt']
-            need_be_same=["caption_model", "rnn_type", "rnn_size", "num_layers"]
-            for checkme in need_be_same:
-                assert getattr(saved_model_opt, checkme) == getattr(opt, checkme), "Command line argument and saved model disagree on '%s' " % checkme
+            # saved_model_opt = infos['opt']
+            # need_be_same=["caption_model", "rnn_type", "rnn_size", "num_layers"]
+            # for checkme in need_be_same:
+            #     assert getattr(saved_model_opt, checkme) == getattr(opt, checkme), "Command line argument and saved model disagree on '%s' " % checkme
     infos['opt'] = opt
 
     #########################
@@ -77,32 +76,32 @@ def main(gpu, ngpus_per_node, opt):
     #########################
     # naive dict logger
     histories = defaultdict(dict)
-    if opt.start_from is not None and os.path.isfile(os.path.join('log_' + opt.start_from, 'histories_'+opt.id+'.pkl')):
-        with open(os.path.join('log_' + opt.start_from, 'histories_'+opt.id+'.pkl'), 'rb') as f:
+    if opt.start_from is not None and os.path.isfile(os.path.join(opt.start_from, 'histories_'+opt.id+'.pkl')):
+        with open(os.path.join(opt.start_from, 'histories_'+opt.id+'.pkl'), 'rb') as f:
             histories.update(utils.pickle_load(f))
 
     # tensorboard logger
-    if gpu == 0:
-        tb_summary_writer = SummaryWriter(opt.checkpoint_path)
+    tb_summary_writer = SummaryWriter(opt.checkpoint_path)
 
     ##########################
     # Build model
     ##########################
-    opt.vocab = loader.get_vocab()
-    model = models.setup(opt).to(device)
+    opt.vocab = infos['vocab']
+    model = models.setup(opt).cuda()
 
     del opt.vocab
     # Load pretrained weights:
-    if opt.start_from is not None and os.path.isfile(os.path.join('log_' + opt.start_from, 'model.pth')):
-        model.load_state_dict(torch.load(os.path.join('log_' + opt.start_from, 'model.pth'), map_location=lambda storage, loc: storage), strict=False)
+    if opt.start_from is not None and os.path.isfile(os.path.join(opt.start_from, 'model.pth')):
+        print(f'load model : {os.path.join(opt.start_from, "model.pth")}')
+        print(model.load_state_dict(torch.load(os.path.join(opt.start_from, 'model.pth')),strict=False))
     
     # Wrap generation model with loss function(used for training)
     # This allows loss function computed separately on each machine
     lw_model = LossWrapper(model, opt)
     # Wrap with dataparallel
-    dp_model = DDP(model, device_ids=[device], output_device=device)
+    dp_model = torch.nn.DataParallel(model)
     dp_model.vocab = getattr(model, 'vocab', None)  # nasty
-    dp_lw_model = DDP(lw_model, device_ids=[device], output_device=device)
+    dp_lw_model = torch.nn.DataParallel(lw_model)
 
     ##########################
     #  Build optimizer
@@ -118,8 +117,12 @@ def main(gpu, ngpus_per_node, opt):
     else:
         optimizer = utils.build_optimizer(model.parameters(), opt)
     # Load the optimizer
-    if opt.start_from is not None and os.path.isfile(os.path.join('log_' + opt.start_from,"optimizer.pth")):
-        optimizer.load_state_dict(torch.load(os.path.join('log_' + opt.start_from, 'optimizer.pth'), map_location=lambda storage, loc: storage))
+    if opt.start_from is not None and os.path.isfile(os.path.join(opt.start_from,"optimizer.pth")):
+        print('load optimizer')
+        try:
+            optimizer.load_state_dict(torch.load(os.path.join(opt.start_from, 'optimizer.pth')))
+        except:
+            print('fail load optimizer')
 
     #########################
     # Get ready to start
@@ -130,6 +133,7 @@ def main(gpu, ngpus_per_node, opt):
     if 'iterators' in infos:
         infos['loader_state_dict'] = {split: {'index_list': infos['split_ix'][split], 'iter_counter': infos['iterators'][split]} for split in ['train', 'val', 'test']}
     loader.load_state_dict(infos['loader_state_dict'])
+    loader.dataset.ix_to_word = infos['vocab']
     if opt.load_best_score == 1:
         best_val_score = infos.get('best_val_score', None)
     if opt.noamopt:
@@ -139,6 +143,7 @@ def main(gpu, ngpus_per_node, opt):
     epoch_done = True
     # Assure in training mode
     dp_lw_model.train()
+
     # Start training
     try:
         while True:
@@ -194,11 +199,10 @@ def main(gpu, ngpus_per_node, opt):
             start = time.time()
 
             tmp = [data['fc_feats'], data['att_feats'], data['labels'], data['masks'], data['att_masks']]
-            tmp = [_ if _ is None else _.to(device) for _ in tmp]
+            tmp = [_ if _ is None else _.cuda() for _ in tmp]
             fc_feats, att_feats, labels, masks, att_masks = tmp
 
             optimizer.zero_grad()
-            # train_sampler.set_epoch(epoch)
             model_out = dp_lw_model(fc_feats, att_feats, labels, masks, att_masks, data['gts'], torch.arange(0, len(data['gts'])), sc_flag, struc_flag, drop_worst_flag)
 
             if not drop_worst_flag:
@@ -232,24 +236,20 @@ def main(gpu, ngpus_per_node, opt):
 
             # Write the training loss summary
             if (iteration % opt.losses_log_every == 0):
-                if gpu == 0:
-                    tb_summary_writer.add_scalar('train_loss', train_loss, iteration)
+                tb_summary_writer.add_scalar('train_loss', train_loss, iteration)
                 if opt.noamopt:
                     opt.current_lr = optimizer.rate()
                 elif opt.reduce_on_plateau:
                     opt.current_lr = optimizer.current_lr
-                if gpu == 0:
-                    tb_summary_writer.add_scalar('learning_rate', opt.current_lr, iteration)
-                    tb_summary_writer.add_scalar('scheduled_sampling_prob', model.ss_prob, iteration)
+                tb_summary_writer.add_scalar('learning_rate', opt.current_lr, iteration)
+                tb_summary_writer.add_scalar('scheduled_sampling_prob', model.ss_prob, iteration)
                 if sc_flag:
-                    if gpu == 0:
-                        tb_summary_writer.add_scalar('avg_reward', model_out['reward'].mean(), iteration)
+                    tb_summary_writer.add_scalar('avg_reward', model_out['reward'].mean(), iteration)
                 elif struc_flag:
-                    if gpu == 0:
-                        tb_summary_writer.add_scalar('lm_loss', model_out['lm_loss'].mean().item(), iteration)
-                        tb_summary_writer.add_scalar('struc_loss', model_out['struc_loss'].mean().item(), iteration)
-                        tb_summary_writer.add_scalar('reward', model_out['reward'].mean().item(), iteration)
-                        tb_summary_writer.add_scalar('reward_var', model_out['reward'].var(1).mean(), iteration)
+                    tb_summary_writer.add_scalar('lm_loss', model_out['lm_loss'].mean().item(), iteration)
+                    tb_summary_writer.add_scalar('struc_loss', model_out['struc_loss'].mean().item(), iteration)
+                    tb_summary_writer.add_scalar('reward', model_out['reward'].mean().item(), iteration)
+                    tb_summary_writer.add_scalar('reward_var', model_out['reward'].var(1).mean(), iteration)
 
                 histories['loss_history'][iteration] = train_loss if not sc_flag else model_out['reward'].mean()
                 histories['lr_history'][iteration] = opt.current_lr
@@ -259,54 +259,51 @@ def main(gpu, ngpus_per_node, opt):
             infos['iter'] = iteration
             infos['epoch'] = epoch
             infos['loader_state_dict'] = loader.state_dict()
-
+            
             # make evaluation on validation set, and save model
             if (iteration % opt.save_checkpoint_every == 0 and not opt.save_every_epoch) or \
                 (epoch_done and opt.save_every_epoch):
                 # eval model
-                if gpu == 0:
-                    eval_kwargs = {'split': 'val',
-                                    'dataset': opt.input_json}
-                    eval_kwargs.update(vars(opt))
-                    val_loss, predictions, lang_stats = eval_utils.eval_split(
-                        dp_model.module, lw_model.crit, loader, eval_kwargs)
+                eval_kwargs = {'split': 'val',
+                                'dataset': opt.input_json}
+                eval_kwargs.update(vars(opt))
+                val_loss, predictions, lang_stats = eval_utils.eval_split(
+                    dp_model, lw_model.crit, loader, eval_kwargs)
 
-                    if opt.reduce_on_plateau:
-                        if 'CIDEr' in lang_stats:
-                            optimizer.scheduler_step(-lang_stats['CIDEr'])
-                        else:
-                            optimizer.scheduler_step(val_loss)
-                    # Write validation result into summary
-                    if gpu == 0:
-                        tb_summary_writer.add_scalar('validation loss', val_loss, iteration)
-                    if lang_stats is not None:
-                        for k,v in lang_stats.items():
-                            if gpu == 0:
-                                tb_summary_writer.add_scalar(k, v, iteration)
-                    histories['val_result_history'][iteration] = {'loss': val_loss, 'lang_stats': lang_stats, 'predictions': predictions}
-
-                    # Save model if is improving on validation result
-                    if opt.language_eval == 1:
-                        current_score = lang_stats['CIDEr']
+                if opt.reduce_on_plateau:
+                    if 'CIDEr' in lang_stats:
+                        optimizer.scheduler_step(-lang_stats['CIDEr'])
                     else:
-                        current_score = - val_loss
+                        optimizer.scheduler_step(val_loss)
+                # Write validation result into summary
+                tb_summary_writer.add_scalar('validation loss', val_loss, iteration)
+                if lang_stats is not None:
+                    for k,v in lang_stats.items():
+                        tb_summary_writer.add_scalar(k, v, iteration)
+                histories['val_result_history'][iteration] = {'loss': val_loss, 'lang_stats': lang_stats, 'predictions': predictions}
 
-                    best_flag = False
+                # Save model if is improving on validation result
+                if opt.language_eval == 1:
+                    current_score = lang_stats['CIDEr']
+                else:
+                    current_score = - val_loss
 
-                    if best_val_score is None or current_score > best_val_score:
-                        best_val_score = current_score
-                        best_flag = True
+                best_flag = False
 
-                    # Dump miscalleous informations
-                    infos['best_val_score'] = best_val_score
+                if best_val_score is None or current_score > best_val_score:
+                    best_val_score = current_score
+                    best_flag = True
 
-                    utils.save_checkpoint(opt, model, infos, optimizer, histories)
-                    if opt.save_history_ckpt:
-                        utils.save_checkpoint(opt, model, infos, optimizer,
-                            append=str(epoch) if opt.save_every_epoch else str(iteration))
+                # Dump miscalleous informations
+                infos['best_val_score'] = best_val_score
 
-                    if best_flag:
-                        utils.save_checkpoint(opt, model, infos, optimizer, append='best')
+                utils.save_checkpoint(opt, model, infos, optimizer, histories)
+                if opt.save_history_ckpt:
+                    utils.save_checkpoint(opt, model, infos, optimizer,
+                        append=str(epoch) if opt.save_every_epoch else str(iteration))
+
+                if best_flag:
+                    utils.save_checkpoint(opt, model, infos, optimizer, append='best')
 
     except (RuntimeError, KeyboardInterrupt):
         print('Save ckpt on exception ...')
@@ -317,12 +314,6 @@ def main(gpu, ngpus_per_node, opt):
 
 if __name__ == '__main__':
     opt = opts.parse_opt()
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-    os.environ['MASTER_PORT'] = opt.master_port
-    os.environ['OMP_NUM_THREADS'] = '1'
-    os.environ['CUDA_VISIBLE_DEVICES'] = opt.device_ids
-    mp.spawn(main,
-             args=(opt.world_size, opt,),
-             nprocs=opt.world_size,
-             join=True)
+    # os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '1,2,3'
+    train(opt)

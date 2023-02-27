@@ -121,6 +121,8 @@ class EncoderLayer(nn.Module):
 
     def forward(self, x, mask):
         "Follow Figure 1 (left) for connections."
+        x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))
+
         confounder = self.clip_emb(self.c3dict.to(x.device))
         confounder = torch.stack([confounder] * x.shape[0])
         confounder = (x.std() / confounder.std()) * confounder
@@ -128,8 +130,8 @@ class EncoderLayer(nn.Module):
         score = torch.softmax(-1 * dist, axis=-1)
         confounder = torch.matmul(score, confounder)
         confounder = self.clip_emb2(confounder)
+        x = x + confounder
 
-        x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask) + confounder)
         return self.sublayer[1](x, self.feed_forward)
 
 class Decoder(nn.Module):
@@ -252,7 +254,7 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:, :x.size(1)]
         return self.dropout(x)
 
-class TransformerModel_c3cap(AttModel):
+class TransformerModel_c3cap_att_fuse(AttModel):
 
     def make_model(self, src_vocab, tgt_vocab, N_enc=6, N_dec=6, 
                d_model=512, d_ff=2048, h=8, dropout=0.1):
@@ -277,7 +279,7 @@ class TransformerModel_c3cap(AttModel):
         return model
 
     def __init__(self, opt):
-        super(TransformerModel_c3cap, self).__init__(opt)
+        super(TransformerModel_c3cap_att_fuse, self).__init__(opt)
         self.opt = opt
         # self.config = yaml.load(open(opt.config_file))
         

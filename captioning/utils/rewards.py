@@ -8,12 +8,19 @@ from collections import OrderedDict
 import torch
 
 import sys
+sys.path.append("/home/kyj/projects/c3cap-ver2/cider")
+sys.path.append("/home/junho/c3cap2/cider")
 try:
-    sys.path.append("cider")
-    sys.path.append("/home/kyj/projects/c3cap-ver2/cider")
+    sys.path.append("/home/habangk123/c3cap/cider")
+    sys.path.append("/home/yeonju_gpu/c3cap/cider")
+    sys.path.append("/home/yeonju_gcp/c3cap/cider")
     from pyciderevalcap.ciderD.ciderD import CiderD
     from pyciderevalcap.cider.cider import Cider
-    sys.path.append("coco-caption")
+    sys.path.append("/home/habangk123/c3cap/coco-caption")
+    sys.path.append("/home/yeonju_gpu/c3cap/coco-caption")
+    sys.path.append("/home/yeonju_gcp/c3cap/coco-caption")
+    sys.path.append("/home/junho/c3cap2/coco-caption")
+    sys.path.append("/home/kyj/projects/c3cap-ver2/coco-caption")
     from pycocoevalcap.bleu.bleu import Bleu
 except:
     print('cider or coco-caption missing')

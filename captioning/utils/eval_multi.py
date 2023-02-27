@@ -20,16 +20,25 @@ from .div_utils import compute_div_n, compute_global_div_n
 
 import sys
 try:
-    sys.path.append("coco-caption")
+    sys.path.append("/home/habangk123/c3cap/coco-caption")
+    sys.path.append("/home/yeonju_gpu/c3cap/coco-caption")
+    sys.path.append("/home/yeonju_gcp/c3cap/coco-caption")
+    sys.path.append("/home/kyj/projects/c3cap-ver2/coco-caption")
+    sys.path.append("/home/junho/c3cap2/coco-caption")
     annFile = 'coco-caption/annotations/captions_val2014.json'
     from pycocotools.coco import COCO
     from pycocoevalcap.eval import COCOEvalCap
     from pycocoevalcap.eval_spice import COCOEvalCapSpice
     from pycocoevalcap.tokenizer.ptbtokenizer import PTBTokenizer
     from pycocoevalcap.bleu.bleu import Bleu
-    sys.path.append("cider")
+    sys.path.append("/home/habangk123/c3cap/cider")
+    sys.path.append("/home/yeonju_gpu/c3cap/cider")
+    sys.path.append("/home/yeonju_gcp/c3cap/cider")
+    sys.path.append("/home/kyj/projects/c3cap-ver2/cider")
+    sys.path.append("/home/junho/c3cap2/cider")
     from pyciderevalcap.cider.cider import Cider
 except:
+    raise ImportError
     print('Warning: requirements for eval_multi not satisfied')
 
 

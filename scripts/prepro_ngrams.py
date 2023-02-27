@@ -10,7 +10,10 @@ import captioning.utils.misc as utils
 from collections import defaultdict
 
 import sys
-sys.path.append("cider")
+sys.path.append("/home/yeonju_gpu/c3cap/cider")
+sys.path.append("/home/yeonju_gcp/c3cap/cider")
+sys.path.append("/home/kyj/projects/c3cap-ver2/cider")
+sys.path.append("/home/junho/c3cap2/cider")
 from pyciderevalcap.ciderD.ciderD_scorer import CiderScorer
 
 

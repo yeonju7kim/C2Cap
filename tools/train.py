@@ -1,10 +1,18 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+import sys, os
 
+sys.path.append('/home/habangk123/c3cap')
+sys.path.append('/home/yeonju_gpu/c3cap')
+sys.path.append('/home/yeonju_gcp/c3cap')
+sys.path.append('/home/yeonju_gpu/c3cap/captioning')
+sys.path.append('/home/yeonju_gcp/c3cap/captioning')
+sys.path.append('/home/kyj/projects/c3cap-ver2/captioning')
+sys.path.append('/home/kyj/projects/c3cap-ver2')
+sys.path.append('/home/junho/c3cap2')
+sys.path.append('/home/junho/c3cap2/captioning')
 try:
-    import sys, os
-    sys.path.append('/home/kyj/projects/c3cap-ver2')
     sys.path.remove('/home/kyj/projects/self-critical.pytorch')
 except:
     pass
@@ -84,7 +92,8 @@ def train(opt):
     del opt.vocab
     # Load pretrained weights:
     if opt.start_from is not None and os.path.isfile(os.path.join(opt.start_from, 'model.pth')):
-        model.load_state_dict(torch.load(os.path.join(opt.start_from, 'model.pth')))
+        print(f'load model : {os.path.join(opt.start_from, "model.pth")}')
+        print(model.load_state_dict(torch.load(os.path.join(opt.start_from, 'model.pth')),strict=False))
     
     # Wrap generation model with loss function(used for training)
     # This allows loss function computed separately on each machine
@@ -109,7 +118,11 @@ def train(opt):
         optimizer = utils.build_optimizer(model.parameters(), opt)
     # Load the optimizer
     if opt.start_from is not None and os.path.isfile(os.path.join(opt.start_from,"optimizer.pth")):
-        optimizer.load_state_dict(torch.load(os.path.join(opt.start_from, 'optimizer.pth')))
+        print('load optimizer')
+        try:
+            optimizer.load_state_dict(torch.load(os.path.join(opt.start_from, 'optimizer.pth')))
+        except:
+            print('fail load optimizer')
 
     #########################
     # Get ready to start
@@ -159,7 +172,7 @@ def train(opt):
                     init_scorer(opt.cached_tokens)
                 else:
                     sc_flag = False
-                
+
                 # If start structure loss training
                 if opt.structure_after != -1 and epoch >= opt.structure_after:
                     struc_flag = True
@@ -172,7 +185,7 @@ def train(opt):
                     drop_worst_flag = False
 
                 epoch_done = False
-                    
+
             start = time.time()
             if opt.use_warmup and (iteration < opt.noamopt_warmup):
                 opt.current_lr = opt.learning_rate * (iteration+1) / opt.noamopt_warmup
@@ -187,7 +200,7 @@ def train(opt):
             tmp = [data['fc_feats'], data['att_feats'], data['labels'], data['masks'], data['att_masks']]
             tmp = [_ if _ is None else _.cuda() for _ in tmp]
             fc_feats, att_feats, labels, masks, att_masks = tmp
-            
+
             optimizer.zero_grad()
             model_out = dp_lw_model(fc_feats, att_feats, labels, masks, att_masks, data['gts'], torch.arange(0, len(data['gts'])), sc_flag, struc_flag, drop_worst_flag)
 
@@ -300,6 +313,6 @@ def train(opt):
 
 if __name__ == '__main__':
     opt = opts.parse_opt()
-    os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-    os.environ['CUDA_VISIBLE_DEVICES'] = opt.device_ids
+    # os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+    # os.environ['CUDA_VISIBLE_DEVICES'] = '1,2,3'
     train(opt)

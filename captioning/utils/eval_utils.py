@@ -17,15 +17,29 @@ import sys
 from . import misc as utils
 
 # load coco-caption if available
+
+sys.path.append("/home/habangk123/c3cap/coco-caption")
+sys.path.append("/home/yeonju_gpu/c3cap/coco-caption")
+sys.path.append("/home/yeonju_gcp/c3cap/coco-caption")
+sys.path.append("/home/kyj/projects/c3cap-ver2/coco-caption")
+sys.path.append("/home/junho/c3cap2/coco-caption")
+sys.path.append("/home/habangk123/c3cap/coco-caption/pycocoevalcap")
+sys.path.append("/home/yeonju_gpu/c3cap/coco-caption/pycocoevalcap")
+sys.path.append("/home/yeonju_gcp/c3cap/coco-caption/pycocoevalcap")
+sys.path.append("/home/junho/c3cap2/coco-caption/pycocoevalcap")
+sys.path.append("./coco-caption/pycocoevalcap")
+sys.path.append("coco-caption/pycocoevalcap")
+sys.path.append("/home/kyj/projects/c3cap-ver2/coco-caption/pycocoevalcap")
+sys.path.append("pycocoevalcap")
 try:
-    sys.path.append("coco-caption")
-    sys.path.append("/home/kyj/projects/c3cap-ver2/coco-caption")
-    sys.path.append("coco-caption/pycocoevalcap")
-    sys.path.append("/home/kyj/projects/c3cap-ver2/coco-caption/pycocoevalcap")
     from pycocotools.coco import COCO
+except:
+    print('Warning: pycocotools not available')
+try:
     from pycocoevalcap.eval import COCOEvalCap
 except:
-    print('Warning: coco-caption not available')
+    raise ImportError
+    print('Warning: pycocoevalcap.eval not available')
 
 bad_endings = ['a','an','the','in','for','at','of','with','before','after','on','upon','near','to','is','are','am']
 bad_endings += ['the']

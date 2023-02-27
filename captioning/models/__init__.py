@@ -13,6 +13,15 @@ from .FCModel import FCModel
 from .AttModel import *
 from .TransformerModel import TransformerModel
 from .TransformerModel_c3cap import TransformerModel_c3cap
+from .TransformerModel_c3cap_no_projection_decoder import TransformerModel_c3cap_no_projection_decoder
+from .TransformerModel_c3cap_no_projection import TransformerModel_c3cap_no_projection
+from .TransformerModel_c3cap_no_projection_instance_normalize import \
+    TransformerModel_c3cap_no_projection_instance_normalize
+from .TransformerModel_c3cap_no_projection_same_structure import TransformerModel_c3cap_no_projection_same_structure
+from .TransformerModel_c3cap_scaled import TransformerModel_c3cap_scaled
+from .TransformerModel_c3cap_l2distance import TransformerModel_c3cap_l2distance
+from .TransformerModel_c3cap_l2distance_scaled import TransformerModel_c3cap_l2distance_scaled
+from .TransformerModel_c3cap_att_fuse import TransformerModel_c3cap_att_fuse
 from .cachedTransformer import TransformerModel as cachedTransformer
 from .BertCapModel import BertCapModel
 from .M2Transformer import M2TransformerModel
@@ -62,7 +71,25 @@ def setup(opt):
         else:
             model = TransformerModel(opt)
     elif opt.caption_model == 'transformer_c3cap':
-        model = TransformerModel_c3cap(opt)
+        if opt.scaled:
+            model = TransformerModel_c3cap_scaled(opt)
+        else:
+            model = TransformerModel_c3cap(opt)
+    elif opt.caption_model == 'transformer_c3cap_l2distance':
+        if opt.scaled:
+            model = TransformerModel_c3cap_l2distance_scaled(opt)
+        else:
+            model = TransformerModel_c3cap_l2distance(opt)
+    elif opt.caption_model == 'transformer_c3cap_att_fuse':
+        model = TransformerModel_c3cap_att_fuse(opt)
+    elif opt.caption_model == 'transformer_c3cap_no_projection_decoder':
+        model = TransformerModel_c3cap_no_projection_decoder(opt)
+    elif opt.caption_model == 'transformer_c3cap_no_projection':
+        model = TransformerModel_c3cap_no_projection(opt)
+    elif opt.caption_model == 'transformer_c3cap_no_projection_instance_normalize':
+        model = TransformerModel_c3cap_no_projection_instance_normalize(opt)
+    elif opt.caption_model == 'transformer_c3cap_no_projection_same_structure':
+        model = TransformerModel_c3cap_no_projection_same_structure(opt)
     # AoANet
     elif opt.caption_model == 'aoa':
         model = AoAModel(opt)

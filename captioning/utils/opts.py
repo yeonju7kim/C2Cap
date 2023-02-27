@@ -41,6 +41,7 @@ def parse_opt():
     # Model settings
     parser.add_argument('--caption_model', type=str, default="show_tell",
                     help='show_tell, show_attend_tell, all_img, fc, att2in, att2in2, att2all2, adaatt, adaattmo, updown, stackatt, denseatt, transformer')
+    parser.add_argument('--scaled', action='store_true')
     parser.add_argument('--rnn_size', type=int, default=512,
                     help='size of the rnn in number of hidden nodes in each layer')
     parser.add_argument('--num_layers', type=int, default=1,
@@ -214,6 +215,8 @@ def parse_opt():
                         help='')
     parser.add_argument('--world_size', type=int, default=3,
                         help='')
+    parser.add_argument('--N_enc', type=int, default=6)
+    parser.add_argument('--N_dec', type=int, default=6)
     parser.add_argument('--device_ids', type=str, default='1,2,3',
                         help='')
 

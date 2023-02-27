@@ -12,4 +12,4 @@ structure_loss_type: new_self_critical
 
 max_epochs: 40
 clip_confounder_dictionary_path: clip_feature_train_cluster.pkl
-caption_model: transformer_c3cap
+caption_model: transformer_c3cap_no_projection_decoder
