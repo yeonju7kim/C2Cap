@@ -2,35 +2,17 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-import numpy as np
 import json
-from json import encoder
-import random
-import string
-import time
 import os
 import sys
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+
 from . import misc as utils
 
-# load coco-caption if available
-
-sys.path.append("/home/habangk123/c3cap/coco-caption")
-sys.path.append("/home/yeonju_gpu/c3cap/coco-caption")
-sys.path.append("/home/yeonju_gcp/c3cap/coco-caption")
-sys.path.append("/home/kyj/projects/c3cap-ver2/coco-caption")
-sys.path.append("/home/junho/c3cap2/coco-caption")
-sys.path.append("/home/habangk123/c3cap/coco-caption/pycocoevalcap")
-sys.path.append("/home/yeonju_gpu/c3cap/coco-caption/pycocoevalcap")
-sys.path.append("/home/yeonju_gcp/c3cap/coco-caption/pycocoevalcap")
-sys.path.append("/home/junho/c3cap2/coco-caption/pycocoevalcap")
-sys.path.append("./coco-caption/pycocoevalcap")
-sys.path.append("coco-caption/pycocoevalcap")
-sys.path.append("/home/kyj/projects/c3cap-ver2/coco-caption/pycocoevalcap")
-sys.path.append("pycocoevalcap")
+sys.path.append("./coco-caption")
 try:
     from pycocotools.coco import COCO
 except:

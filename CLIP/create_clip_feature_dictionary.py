@@ -22,16 +22,16 @@ from PIL import Image
 from tqdm import tqdm
 from sklearn.cluster import KMeans
 from torchvision.transforms import RandAugment
-import matplotlib.pyplot as plt
 
 class CLIPFeatureExtractor():
-    def __init__(self, clip_feature_hdf, train_folder, annotation_path, aug_num):
+    def __init__(self, clip_feature_hdf, train_folder,valid_folder, aug_num, aug_mag):
         self.clip_feature_hdf = clip_feature_hdf
         self.train_folder = train_folder
-        self.train_annotation_path = annotation_path
+        self.valid_folder = valid_folder
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.rand_aug = RandAugment(magnitude=5)
+        self.rand_aug = RandAugment(magnitude=aug_mag)
         self.aug_num = aug_num
+        self.aug_mag = aug_mag
         if os.path.exists(self.clip_feature_hdf) == False:
             self.save_clip_feature_hdf()
 
@@ -48,9 +48,15 @@ class CLIPFeatureExtractor():
             for idx, file in enumerate(tqdm(os.listdir(self.train_folder))):
                 file = os.path.join(self.train_folder, file)
                 image = Image.open(file)
-                # plt.imshow(self.rand_aug(image))
-                # plt.show()
-                clip_features = np.array([self._get_clip_feature(self.rand_aug(image))[0] for i in range(self.aug_num)])
+                clip_features = np.array([self._get_clip_feature(self.rand_aug(image))[0] for _ in range(self.aug_num)])
+                clip_features = np.append(clip_features, np.array(self._get_clip_feature(image)), axis=0)
+                img_id = (str)((int)(file.split('_')[-1].split('.')[0]))
+                new_group = h5py_file.create_group(img_id)
+                new_group.create_dataset('image', data=clip_features)
+            for idx, file in enumerate(tqdm(os.listdir(self.valid_folder))):
+                file = os.path.join(self.valid_folder, file)
+                image = Image.open(file)
+                clip_features = np.array([self._get_clip_feature(self.rand_aug(image))[0] for _ in range(self.aug_num)])
                 clip_features = np.append(clip_features, np.array(self._get_clip_feature(image)), axis=0)
                 img_id = (str)((int)(file.split('_')[-1].split('.')[0]))
                 new_group = h5py_file.create_group(img_id)
@@ -76,12 +82,12 @@ class CLIPFeatureCollection():
         self.centroids = centroids
 
 class CLIPClusterConstructor():
-    def __init__(self, clip_feature_hdf, train_folder, annotation_path, clip_cluster_pkl, clip_collections_pkl, k, aug_num):
+    def __init__(self, clip_feature_hdf, train_folder, valid_folder, clip_cluster_pkl, clip_collections_pkl, k, aug_num, aug_mag):
         self.clip_cluster_pkl = clip_cluster_pkl
         self.clip_collections_pkl = clip_collections_pkl
         if os.path.exists(self.clip_cluster_pkl) == False:
-            clip_feature = CLIPFeatureExtractor(clip_feature_hdf, train_folder, annotation_path, aug_num)
-            image_features, cluster_ids = clip_feature.load_clip_feature_hdf()
+            clip_feature_train = CLIPFeatureExtractor(clip_feature_hdf, train_folder, valid_folder, aug_num, aug_mag)
+            image_features, cluster_ids = clip_feature_train.load_clip_feature_hdf()
             cluster_ids = self._cluster_kmean(image_features, k)
             self.save_clip_cluster(image_features, cluster_ids)
 
@@ -140,12 +146,13 @@ class CLIPConfounder():
 def arg_parse():
     parser = argparse.ArgumentParser(description='Clip Cluster Confounder')
     parser.add_argument('--clip_feature_hdf', type=str)
-    parser.add_argument('--train_folder', type=str, default='D:/data/image_captioning/github_ignore_material/raw_data/MS_COCO_2014/train2014/img')
-    parser.add_argument('--train_annotation_path', type=str, default="D:/data/image_captioning/caption_data/annotations_trainval2014/annotations/captions_train2014.json")
-    parser.add_argument('--clip_cluster_pkl', type=str)
-    parser.add_argument('--clip_collections_pkl', type=str)
+    parser.add_argument('--train_folder', type=str, default='/mnt/kyj/MS_COCO_2014/train2014/img')
+    parser.add_argument('--valid_folder', type=str, default='/mnt/kyj/MS_COCO_2014/val2014/img')
+    parser.add_argument('--clip_cluster_pkl', type=str, default=None)
+    parser.add_argument('--clip_collections_pkl', type=str, default=None)
     parser.add_argument('--k', type=int, default=1000)
     parser.add_argument('--aug_num', type=int, default=3)
+    parser.add_argument('--aug_mag', type=int, default=1)
     args = parser.parse_args()
     return args
 
@@ -161,19 +168,15 @@ if __name__ == '__main__':
 
     if args.clip_feature_hdf == None:
         args.clip_feature_hdf = 'clip_feature_train.hdf5'
-        args.clip_feature_hdf = f'{args.clip_feature_hdf.split(".")[0]}_aug{args.aug_num}.{args.clip_feature_hdf.split(".")[1]}'
+        args.clip_feature_hdf = f'{args.clip_feature_hdf.split(".")[0]}_aug{args.aug_num}_all_image_mag{args.aug_mag}.{args.clip_feature_hdf.split(".")[1]}'
     if args.clip_cluster_pkl == None:
         args.clip_cluster_pkl = 'clip_feature_train_cluster.pkl'
-        args.clip_cluster_pkl = f'{args.clip_cluster_pkl.split(".")[0]}_k{args.k}_aug{args.aug_num}.{args.clip_cluster_pkl.split(".")[1]}'
+        args.clip_cluster_pkl = f'{args.clip_cluster_pkl.split(".")[0]}_k{args.k}_aug{args.aug_num}_all_image_mag{args.aug_mag}.{args.clip_cluster_pkl.split(".")[1]}'
     if args.clip_collections_pkl == None:
         args.clip_collections_pkl = 'clip_collections.pkl'
-        args.clip_collections_pkl = f'{args.clip_collections_pkl.split(".")[0]}_k{args.k}_aug{args.aug_num}.{args.clip_collections_pkl.split(".")[1]}'
+        args.clip_collections_pkl = f'{args.clip_collections_pkl.split(".")[0]}_k{args.k}_aug{args.aug_num}_all_image_mag{args.aug_mag}.{args.clip_collections_pkl.split(".")[1]}'
 
-    clip_cluster = CLIPClusterConstructor(args.clip_feature_hdf, args.train_folder, args.train_annotation_path, args.clip_cluster_pkl, args.clip_collections_pkl, args.k, args.aug_num)
+    clip_cluster = CLIPClusterConstructor(args.clip_feature_hdf, args.train_folder, args.valid_folder, args.clip_cluster_pkl, args.clip_collections_pkl, args.k, args.aug_num, args.aug_mag)
     clip_cluster_list, clip_cluster_dictionary = clip_cluster.load_clip_cluster()
     clip_collections = clip_cluster.load_clip_collections()
-    # normalized_clip_cluster_list = normalize(clip_cluster_list)
-    # clip_cluster_pkl_normalized = f'{args.clip_cluster_pkl.split(".")[0]}_normalized.{args.clip_cluster_pkl.split(".")[1]}'
-    # with open(clip_cluster_pkl_normalized, 'wb') as f:
-    #     pickle.dump(normalized_clip_cluster_list, f)
     clip_confounder = CLIPConfounder(args.clip_cluster_pkl)
