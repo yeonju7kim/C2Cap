@@ -12,11 +12,11 @@ To solve the dataset bias problem, we approach from the causal inference perspec
 
 ## Installation
 
-### Requirements
+### Requirements hydra, spacy, and timm
+
 * Python >= 3.9, CUDA >= 11.3
 * PyTorch >= 1.12.0, torchvision >= 0.6.1
-* Other packages: pycocotools, tensorboard, tqdm, h5py, nltk, einops, hydra, spacy, and timm
-
+* Other packages: pycocotools, tensorboard, tqdm, h5py, nltk, einops,
 * First, clone the repository locally:
 ```shell
 git clone https://github.com/yeonju7kim/C2Cap.git
@@ -52,6 +52,12 @@ path/to/coco_caption/
 └── test2014/     # test images
 ```
 * Copy the files in `data/` to the above `annotations` folder. It includes `vocab.json` and some files containing Karapthy ids.
+
+### Constructing the confounder dictionary
+
+```shell
+python create_clip_feature_dictionary.py --train_folder=path_to_coco_train_data --valid_folder=path_to_coco_valid_data
+```
 
 ### Training
 

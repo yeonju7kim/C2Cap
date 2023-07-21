@@ -3,19 +3,8 @@ from __future__ import division
 from __future__ import print_function
 import sys, os
 
-sys.path.append('/home/habangk123/c3cap')
-sys.path.append('/home/yeonju_gpu/c3cap')
-sys.path.append('/home/yeonju_gcp/c3cap')
-sys.path.append('/home/yeonju_gpu/c3cap/captioning')
-sys.path.append('/home/yeonju_gcp/c3cap/captioning')
-sys.path.append('/home/kyj/projects/c3cap-ver2/captioning')
-sys.path.append('/home/kyj/projects/c3cap-ver2')
-sys.path.append('/home/junho/c3cap2')
-sys.path.append('/home/junho/c3cap2/captioning')
-try:
-    sys.path.remove('/home/kyj/projects/self-critical.pytorch')
-except:
-    pass
+sys.path.append(os.path.abspath('./captioning'))
+sys.path.append(os.path.abspath('.'))
 
 import torch
 import torch.nn as nn
